@@ -51,18 +51,13 @@ export class ChangeList {
 }
 
 export class List {
-  private _listItems: Item[];
-
   private _changesAtom: PrimitiveAtom<ChangeList[]>;
   private _listAtom: Atom<Item[]>;
-
+  
   constructor(changes: ChangeList[] = []) {
-    this._listItems = [];
-
     this._changesAtom = atom(changes);
     this._listAtom = atom((get) => {
-      const items = [...this._listItems];
-      items.forEach(item => item.quantity = 0);
+      const items: Item[] = [];
       const changes = get(this._changesAtom);
       for (const change of changes) {
         const changeItems = get(change.itemsAtom);
@@ -77,8 +72,7 @@ export class List {
         }
       }
       const filteredItems = items.filter(item => item.quantity > 0);
-      this._listItems = filteredItems;
-      return this._listItems;
+      return filteredItems;
     });
   }
 
