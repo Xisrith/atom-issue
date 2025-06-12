@@ -1,90 +1,74 @@
-import { atom } from "jotai";
-import type { Atom, PrimitiveAtom } from "jotai";
+import { atom, type Atom, type PrimitiveAtom } from "jotai";
 import { store } from "./store";
 
-
-export class Item {
-  readonly name: string;
-  readonly id: string = crypto.randomUUID();
-
-  private _quantityAtom: PrimitiveAtom<number>;
-
-  constructor(name: string, quantity: number = 1) {
-    this.name = name;
-    this._quantityAtom = atom(quantity);
-  }
-
-  get quantity() {
-    return store.get(this._quantityAtom);
-  }
-
-  set quantity(value: number) {
-    store.set(this._quantityAtom, value);
-  }
-
-  get quantityAtom() {
-    return this._quantityAtom;
-  }
+export interface Item {
+  name: string;
+  quantity: number;
 }
 
-export class ChangeList {
-  private _itemsAtom: PrimitiveAtom<Item[]>;
-
-  constructor(items: Item[] = []) {
-    this._itemsAtom = atom(items);
-  }
-
-  addItem(name: string, quantity: number = 1) {
-    const items = store.get(this._itemsAtom);
-    const item = items.find(i => i.name === name);
-    if (item) {
-      store.set(item.quantityAtom, item.quantity + quantity);;
-    } else {
-      const newItem = new Item(name, quantity);
-      store.set(this._itemsAtom, [...items, newItem]);
-    }
-  }
-
-  get itemsAtom() {
-    return this._itemsAtom;
-  }
+export interface Change {
+  items: Item[];
 }
 
-export class List {
-  private _changesAtom: PrimitiveAtom<ChangeList[]>;
-  private _listAtom: Atom<Item[]>;
-  
-  constructor(changes: ChangeList[] = []) {
-    this._changesAtom = atom(changes);
-    this._listAtom = atom((get) => {
-      const items: Item[] = [];
+export class ListModel {
+  private _changesAtom: PrimitiveAtom<Item[]>;
+  private _historyAtom: PrimitiveAtom<Change[]>;
+  private _itemsAtom: Atom<Item[]>;
+
+  constructor(history: Change[]) {
+    this._changesAtom = atom<Item[]>([]);
+    this._historyAtom = atom<Change[]>(history);
+    this._itemsAtom = atom<Item[]>((get) => {
       const changes = get(this._changesAtom);
-      for (const change of changes) {
-        const changeItems = get(change.itemsAtom);
-        for (const item of changeItems) {
+      const history = get(this._historyAtom);
+      const items: Item[] = [];
+      for (const change of history) {
+        for (const item of change.items) {
           const existingItem = items.find(i => i.name === item.name);
-          const quantity = get(item.quantityAtom);
           if (existingItem) {
-            existingItem.quantity += quantity
+            existingItem.quantity += item.quantity;
           } else {
-            items.push(new Item(item.name, quantity));
+            items.push({ ...item });
           }
         }
       }
-      const filteredItems = items.filter(item => item.quantity > 0);
-      return filteredItems;
+      for (const item of changes) {
+        const existingItem = items.find(i => i.name === item.name);
+        if (existingItem) {
+          existingItem.quantity += item.quantity;
+        } else {
+          items.push({ ...item });
+        }
+      }
+      return items.filter(item => item.quantity > 0);
     });
   }
 
-  addItem(name: string, quantity: number = 1) {
+  add(name: string, quantity: number = 1): void {
     const changes = store.get(this._changesAtom);
-    const activeChange = changes[changes.length - 1];
-    if (activeChange) {
-      activeChange.addItem(name, quantity);
+    const item = changes.find(item => item.name === name);
+
+    if (item) {
+      item.quantity += quantity;
+      store.set(this._changesAtom, changes.filter(item => item.quantity !== 0));
+    } else {
+      store.set(this._changesAtom, [...changes, { name, quantity }]);
     }
   }
 
-  get listAtom() {
-    return this._listAtom;
+  revert(): void {
+    store.set(this._changesAtom, []);
+  }
+
+  save(): void {
+    const changes = store.get(this._changesAtom);
+    const history = store.get(this._historyAtom);
+
+    store.set(this._historyAtom, [...history, { items: changes }]);
+    store.set(this._changesAtom, []);
+  }
+
+  get itemsAtom(): Atom<Item[]> {
+    return this._itemsAtom;
   }
 }

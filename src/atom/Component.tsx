@@ -1,28 +1,29 @@
-import { useAtom, useAtomValue } from "jotai";
-import { ChangeList, Item, List } from "./atoms";
+import { useAtom } from "jotai";
+import { ListModel } from "./atoms";
+import type { Item } from "./atoms";
 
-const list = new List([
-  new ChangeList([
-    new Item("Item 1", 1),
-    new Item("Item 2", 1),
-  ]),
-  new ChangeList([]),
+const listModel = new ListModel([
+  {
+    items: [
+      { name: "Item 1", quantity: 1 },
+      { name: "Item 2", quantity: 1 },
+    ],
+  },
 ]);
 
 interface RowProps {
   item: Item;
-  list: List;
+  onIncrement: () => void;
+  onDecrement: () => void;
 }
 
-export const Row = ({ item, list }: RowProps) => {
-  const [quantity] = useAtom(item.quantityAtom);
-
+export const Row = ({ item, onIncrement, onDecrement }: RowProps) => {
   const increment = () => {
-    list.addItem(item.name, 1);
+    onIncrement();
   }
 
   const decrement = () => {
-    list.addItem(item.name, -1);
+    onDecrement();
   }
 
   return (
@@ -30,7 +31,7 @@ export const Row = ({ item, list }: RowProps) => {
       <td className="px-3 py-2 text-sm text-gray-900">{item.name}</td>
       <td className="px-3 py-2 text-sm text-gray-900">
         <span>
-          {quantity}
+          {item.quantity}
           <button onClick={increment}>Add</button>
           <button onClick={decrement}>Remove</button>
         </span>
@@ -40,7 +41,7 @@ export const Row = ({ item, list }: RowProps) => {
 }
 
 export const Component = () => {
-  const items = useAtomValue(list.listAtom);
+  const [items] = useAtom(listModel.itemsAtom);
 
   return (
     <table className="w-full">
@@ -51,7 +52,14 @@ export const Component = () => {
         </tr>
       </thead>
       <tbody>
-        {items.map((item) => <Row key={item.name} item={item} list={list} />)}
+        {items.map((item) => (
+          <Row
+            key={item.name}
+            item={item}
+            onIncrement={() => listModel.add(item.name, 1)}
+            onDecrement={() => listModel.add(item.name, -1)}
+          />
+        ))}
       </tbody>
     </table>
   )
